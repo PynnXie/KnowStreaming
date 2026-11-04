@@ -404,7 +404,7 @@ public class GroupServiceImpl extends BaseKafkaVersionControlService implements 
                     return;
                 }
 
-                groupDAO.deleteById(elem.getId());
+                groupMemberDAO.deleteById(elem.getId());
             } catch (Exception e) {
                 LOGGER.error(
                         "method=batchReplaceGroupMembers||clusterPhyId={}||groupName={}||topicName={}||msg=delete expired group data in db failed||errMsg=exception",
