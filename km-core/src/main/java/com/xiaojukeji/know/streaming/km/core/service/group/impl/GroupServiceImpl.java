@@ -368,9 +368,10 @@ public class GroupServiceImpl extends BaseKafkaVersionControlService implements 
 
     private void batchReplaceGroupMembers(Long clusterPhyId, List<Group> newGroupList, Set<String> getFailedGroupSet) {
         // DB 中的数据
-        Map<String, GroupMemberPO> dbPOMap = this.listClusterGroupsMemberPO(clusterPhyId)
+        Map<String, Map<String, GroupMemberPO>> dbPOMap = this.listClusterGroupsMemberPO(clusterPhyId)
                 .stream()
-                .collect(Collectors.toMap(elem -> elem.getGroupName() + elem.getTopicName(), Function.identity()));
+                .collect(Collectors.groupingBy(GroupMemberPO::getGroupName,
+                        Collectors.toMap(GroupMemberPO::getTopicName, Function.identity())));
 
         // 进行数据的更新
         for (Group group: newGroupList) {
@@ -378,7 +379,8 @@ public class GroupServiceImpl extends BaseKafkaVersionControlService implements 
                 try {
                     GroupMemberPO newPO = new GroupMemberPO(clusterPhyId, member.getTopicName(), group.getName(), group.getState().getState(), member.getMemberCount(), new Date());
 
-                    GroupMemberPO dbPO = dbPOMap.remove(newPO.getGroupName() + newPO.getTopicName());
+                    Map<String, GroupMemberPO> groupMembers = dbPOMap.get(newPO.getGroupName());
+                    GroupMemberPO dbPO = groupMembers == null ? null : groupMembers.remove(newPO.getTopicName());
                     if (dbPO == null) {
                         // 数据不存在则直接写入
                         groupMemberDAO.insert(newPO);
@@ -397,7 +399,7 @@ public class GroupServiceImpl extends BaseKafkaVersionControlService implements 
         }
 
         // 删除剩余不存在的
-        dbPOMap.values().forEach(elem -> {
+        dbPOMap.values().stream().flatMap(groupMembers -> groupMembers.values().stream()).forEach(elem -> {
             try {
                 if (getFailedGroupSet.contains(elem.getGroupName())) {
                     // 该group信息获取失败，所以忽略对该数据的删除
